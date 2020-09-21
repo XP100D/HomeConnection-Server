@@ -47,6 +47,7 @@ fun main() {
 }
 
 fun doIt(socketClient: Client) {
+    val commandForGetDevices = "GETDEVICES"
 
     thread {
         val textReceived = socketClient.getReceivedCommand()
@@ -55,40 +56,47 @@ fun doIt(socketClient: Client) {
         val macAddress = catchMacAddress(separateArguments(textReceived, "-".toRegex()))
 
         if (macAddress.isNullOrEmpty()) {
-            val deviceIpAndCommand: List<String> = separateDestinationAndCommand(textReceived)
+            // Checks whether the command received from the client is to get devices list
+            if(textReceived.toUpperCase() != commandForGetDevices) {
+                val listWithDeviceIpAndCommand: List<String> = separateDestinationAndCommand(textReceived)
 
-            if (deviceIpAndCommand.size > 1) {
-                val ip = deviceIpAndCommand[0]
-                val commandReceivedFromClient = deviceIpAndCommand[1]
+                if (listWithDeviceIpAndCommand.size > 1) {
+                    val ip = listWithDeviceIpAndCommand[0]
+                    val commandReceivedFromClient = listWithDeviceIpAndCommand[1]
 
-                val device = ipExists(ip) //returns the device's name if it exists on server database
+                    val device = ipExists(ip) //returns the Device instance if this ip exists on server database
 
-                if (device != null) {
-                    if (device.sendCommand(commandReceivedFromClient) && device.statOfDevice != null) {
-                        socketClient.sendFeedback(device.statOfDevice)
-                        if (commandReceivedFromClient != Device.COMMAND_STATUS && device.statOfDevice != Device.INVALID_COMMAND) {
-                            println("${dateAndTime()} ${device.name} is ${device.statOfDevice} now")
+                    if (device != null) {
+                        if (device.sendCommand(commandReceivedFromClient) && device.statOfDevice != null) {
+                            socketClient.sendFeedback(device.statOfDevice)
+                            if (commandReceivedFromClient != Device.COMMAND_STATUS && device.statOfDevice != Device.INVALID_COMMAND) {
+                                println("${dateAndTime()} ${device.name} is ${device.statOfDevice} now")
 
-                        } else if (device.statOfDevice == Device.INVALID_COMMAND) {
-                            socketClient.sendFeedback(Device.INVALID_COMMAND)
-                            println("${dateAndTime()} $device doesn't have ${commandReceivedFromClient.toUpperCase()} command")
+                            } else if (device.statOfDevice == Device.INVALID_COMMAND) {
+                                socketClient.sendFeedback(Device.INVALID_COMMAND)
+                                println("${dateAndTime()} $device doesn't have ${commandReceivedFromClient.toUpperCase()} command")
+                            } else {
+                                print("")
+                            }
+
                         } else {
-                            print("")
+                            socketClient.sendFeedback("DISCONNECTED")
+                            println("${dateAndTime()} ${device.name} is not connected on server")
                         }
 
                     } else {
-                        socketClient.sendFeedback("DISCONNECTED")
-                        println("${dateAndTime()} ${device.name} is not connected on server")
+                        socketClient.sendFeedback("UNKNOW_DEVICE")
+                        println("${dateAndTime()} Device ($ip) doesn't exist in the Server Device List\n \t\t\t command ${commandReceivedFromClient.toUpperCase()} solicited by ${socketClient.ip}")
                     }
 
                 } else {
-                    socketClient.sendFeedback("UNKNOW_DEVICE")
-                    println("${dateAndTime()} Device ($ip) doesn't exist in the Server Device List\n \t\t\t command ${commandReceivedFromClient.toUpperCase()} solicited by ${socketClient.ip}")
+                    socketClient.disconnect()
                 }
-
             } else {
-                socketClient.disconnect()
+                deviceManager.allDevicesInJsonString()
+                socketClient.sendFeedback(deviceManager.allDevicesInJsonString())
             }
+
         } else {
             val deviceIp = socketClient.socket.inetAddress.toString()
             val newDevice = deviceManager.authDevice(textReceived,deviceIp)

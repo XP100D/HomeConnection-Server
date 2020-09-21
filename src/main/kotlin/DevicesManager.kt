@@ -1,6 +1,3 @@
-
-
-
 package s
 
 import com.google.gson.Gson
@@ -33,6 +30,27 @@ class DevicesManager : DevicesFolder() {
             }
         }
         return null
+    }
+
+    /** String format >>  {json object content}={other json object content}=  << */
+    fun allDevicesInJsonString() : String {
+        val devicesInJson = StringBuilder()
+
+        if(devicesDir.exists()) {
+            val deviceslist = devicesDir.listFiles()!!
+            val separatorLimit = deviceslist.size - 1
+
+            for((currentNumberOfObjectSeparators, deviceFile) in deviceslist.withIndex()) {
+                val newJsonObjectInString = readDeviceFile(deviceFile)
+                devicesInJson.append(newJsonObjectInString)
+
+                if (currentNumberOfObjectSeparators < separatorLimit) {
+                    devicesInJson.append("=")
+                }
+            }
+        }
+
+        return devicesInJson.toString()
     }
 
     /**
